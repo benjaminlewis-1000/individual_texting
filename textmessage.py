@@ -41,18 +41,13 @@ def sign_in(): # To google voice.
 
 	voice.login(email, password)
 
-win = Tk() # New window 
-elders_var = BooleanVar()
-sisters_var = BooleanVar()
-contents = StringVar()
-
 # TODO features: Sort by first or last name
 # Select all elders or sisters, eq1, eq2, etc. 
 
 f1 = open('ward_carriers.csv', 'r')
 
 wardNames = []
-a = [] # List of selected variables 
+selected_list = [] # List of selected variables 
 
 # Go through the csv file and split into the parts. Strips the end newlines and commas, then parse into list.
 # Format for the csv file, each line: first, last, number, gender, carrier, carrier_sms_gateway (e.g. @tmomail.net), carrier_mms_gateway (for mms)
@@ -83,37 +78,53 @@ wardNames = sorted(wardNames, key=lambda stuff: stuff[0]) # Some kind of sorting
 
 ################ GUI ###############################################
 
+# A couple of special variables. Normal variables can't be set with the TKinter package, so this is how we get the 
+# variables from checkboxes and text fields out. 
+win = Tk() # New window 
+elders_var = BooleanVar()
+sisters_var = BooleanVar()
+# The elders_ and sisters_var variables are booleans to send to all elders and/or sisters. 
+# These don't cause double-messaging. They simply set whether the 'selected' field of the 
+# wardnames entry for that person is set non-zero; if that entry was already non-zero or is 
+# set so later, that's not any sort of a problem.
+contents = StringVar()
+
 # Create a GUI list which has everyone's name.
 listbox = Listbox(win, width=50, height=15, selectmode='multiple', exportselection=1)
 #listbox.grid(row=0, column=0)
 # yscroll = Scrollbar(command=listbox.yview, orient=VERTICAL)
 # listbox.configure(yscrollcommand=yscroll.set)
 
-T = Text(win, height = 8, width = 40)
+T = Text(win, height = 8, width = 40)  # Initialize the text box.
 T.pack()
 
-for i in range(len(wardNames)):
-    listbox.insert(END, wardNames[i][0] + " " + wardNames[i][1])
+for i in range(len(wardNames)): # Put everyone's name in the list, first and last name.  
+    listbox.insert(END, wardNames[i][FIRST] + " " + wardNames[i][LAST])
 
-def get_list():
-	a.append(map(int, listbox.curselection()))
+### End GUI creation. 	
+	
+###### Function defs for general GUI function. ##### 
 
+# Called on window close, linked to the "Send Text" button.
 def close_window(): 
-  get_list()
-  contents.set(T.get(1.0, END))
-  win.destroy()
+  get_list() 
+  contents.set(T.get(1.0, END))  # Get all the text from the text box and put it in the 'contents' StringVar.
+  win.destroy() # Destroy the window, end the loop, get on with the program.
   
-def set(var):
+def get_list(): # Get the list of all selected entries and put them in selected_list.
+	selected_list.append(map(int, listbox.curselection()))
+
+def set(var): # Set a variable. 
   var.set(1)
   
-def clear_select():
+def clear_select(): # Does *not* unset the 'elders' and 'sisters' tags. 
   list_size = listbox.size()
   for x in range (0, list_size):
 	listbox.select_clear(x)
 	wardNames[x][SELECTED] = 0
 	
-def insert_name():
-	T.insert(END, NAMETAG)
+def insert_name():  # Insert the text '<NAME>' in the string at the cursor location. 
+	T.insert(INSERT, NAMETAG)
  
 # GUI Title
 win.wm_title("Ward List")
@@ -132,6 +143,7 @@ button['text'] = "Clear List"
 button['command'] = clear_select
 button.pack()
 
+# Checkbuttons - send to all elders and/or all sisters 
 ebutton = Checkbutton(frame)
 ebutton['text'] ="Elders"
 ebutton['command'] = lambda: set(elders_var)
@@ -142,24 +154,25 @@ sbutton['text'] ="Sisters"
 sbutton['command'] = lambda: set(sisters_var)
 sbutton.pack()
 
+# Check button that will insert the <NAME> tag in the message. 
 nameButton = Button(frame)
 nameButton["text"] = "Insert name here"
 nameButton["command"] = insert_name
 nameButton.pack()
 
-test = IntVar()
+#test = IntVar()
 
+# Pack the box and start the GUI running. This function causes the GUI to loop until it's exited.
+# It is critical to do the mainloop in front of other functionality. 
 listbox.pack()
-
 win.mainloop()
 
 ################# END GUI ###################################
 
-selectedIndex = a[0]
+selectedIndex = selected_list[0]
+print selectedIndex
 
 contents = contents.get() # Contains the message
-
-#message = ""
 
 def sendMessage(message, number, sms_gateway):
 	toaddr = number + sms_gateway
@@ -175,8 +188,6 @@ server.login(username,password)
 
 for x in range(len(selectedIndex)):
 	wardNames[selectedIndex[x]][SELECTED] = 1
-	#print message
-	# Use a def here to send message to 'name', 'number'
 	
 for x in range(len(wardNames)):
 	if wardNames[x][GROUP] == ELDERS:
