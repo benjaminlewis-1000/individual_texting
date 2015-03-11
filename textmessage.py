@@ -1,30 +1,30 @@
 #! /usr/bin/python3
 
-import googlevoice
-import sys
-import time
+# Imports
+import googlevoice # For the edge cases where the carrier doesn't have an sms portal. 
+import sys # System commands
+import time # Time commands
 from googlevoice import Voice
-from Tkinter import *
+from Tkinter import * # For GUI elements
 import re # For regular expressions
 
 # For email
-import smtplib
-from email.MIMEMultipart import MIMEMultipart
+import smtplib  # Library for email
+from email.MIMEMultipart import MIMEMultipart # For working with the subject line and stuff, eventually.
 from email.MIMEText import MIMEText
-import socket
+import socket # For setting the timeout on the socket.
 
 socket.setdefaulttimeout(600)
 
-# Credentials
+# Credentials, to a general account or, alternatively, an app-specific password. 
 username = 'provoysa97th@gmail.com'
 password = 'communications'
 
 # Pound defines, so to speak
-
-ELDERS = 0
+ELDERS = 0  # Group definitions
 SISTERS = 1
 
-FIRST = 0
+FIRST = 0 # Definitions of the fields that I put into the array that holds all members' informations. 
 LAST = 1
 PHONE_NUM = 2
 SELECTED = 3
@@ -32,21 +32,21 @@ GROUP = 4
 SMS_NUM = 5
 MMS_NUM = 6
 
-NAMETAG = "<NAME> "
-voice = Voice()
+NAMETAG = "<NAME>" # For inserting personalized names. This is parsed in parseNames.
+voice = Voice() # Open an instance of Google Voice. 
 
-def sign_in():
+def sign_in(): # To google voice. 
 	email = 'speedyswimmer1000@gmail.com'
 	password = 'ylamrmtdwkqetxjw'
 
 	voice.login(email, password)
 
-win = Tk()
+win = Tk() # New window 
 elders_var = BooleanVar()
 sisters_var = BooleanVar()
 contents = StringVar()
 
-# Features: Sort by first or last name
+# TODO features: Sort by first or last name
 # Select all elders or sisters, eq1, eq2, etc. 
 
 f1 = open('ward_carriers.csv', 'r')
@@ -54,21 +54,21 @@ f1 = open('ward_carriers.csv', 'r')
 wardNames = []
 a = [] # List of selected variables 
 
-def sendMessage(message, number, sms_gateway):
-	toaddr = number + sms_gateway
-	server.sendmail('speedyswimmer1000@gmail.com', toaddr, message)
-
+# Go through the csv file and split into the parts. Strips the end newlines and commas, then parse into list.
+# Format for the csv file, each line: first, last, number, gender, carrier, carrier_sms_gateway (e.g. @tmomail.net), carrier_mms_gateway (for mms)
 for line in f1:
 	line = line.strip()
 	line = line.rstrip(',')
 	split_list = line.split(',')
 	if len(split_list) != 7:
+		# Error handling, such as it is. 
 		print "Error! Please review the entry for " + split_list[0] + " " + split_list[1] + ". It has extra fields or is missing a field."
 		continue
-	# This next line should be fixed... 
-	(first, last, number, gender, carrier, sms_num, mms_num) = split_list #line.split(',')
+	# Assign the split line into appropriate variables 
+	(first, last, number, gender, carrier, sms_num, mms_num) = split_list 
 	#print last + "\n"
-	selected = 0
+	selected = 0  # Default not selected to send a text message to. 
+	# The selected field eventually determines whether the text is sent or not.
 	gender = gender.rstrip('\r\n')
 	if gender == "m" or gender == "M":
 		group = ELDERS
@@ -76,11 +76,14 @@ for line in f1:
 		group = SISTERS
 	#print number + first + last
 	data = [first, last, number.strip(), selected, group, sms_num, mms_num]
-	wardNames.append(data)
+	wardNames.append(data) # Put the data into an array of arrays.
 	
 # Sorting function	
-wardNames = sorted(wardNames, key=lambda stuff: stuff[0])
+wardNames = sorted(wardNames, key=lambda stuff: stuff[0]) # Some kind of sorting function...
 
+################ GUI ###############################################
+
+# Create a GUI list which has everyone's name.
 listbox = Listbox(win, width=50, height=15, selectmode='multiple', exportselection=1)
 #listbox.grid(row=0, column=0)
 # yscroll = Scrollbar(command=listbox.yview, orient=VERTICAL)
@@ -111,16 +114,19 @@ def clear_select():
 	
 def insert_name():
 	T.insert(END, NAMETAG)
-  
+ 
+# GUI Title
 win.wm_title("Ward List")
 frame = Frame(win)
 frame.pack()
 
+# Push button which closes the window, sends the texts. 
 button = Button(frame)
 button['text'] = "Send Text"
 button['command'] = close_window
 button.pack()
 
+# Clear all selections in the list.
 button = Button(frame)
 button['text'] = "Clear List"
 button['command'] = clear_select
@@ -147,11 +153,17 @@ listbox.pack()
 
 win.mainloop()
 
+################# END GUI ###################################
+
 selectedIndex = a[0]
 
 contents = contents.get() # Contains the message
 
-message = ""
+#message = ""
+
+def sendMessage(message, number, sms_gateway):
+	toaddr = number + sms_gateway
+	server.sendmail('speedyswimmer1000@gmail.com', toaddr, message)
 	
 def parseNames(name):
 	test = re.sub("<NAME>", name, contents, count = 400) # Also a count of how many there are
