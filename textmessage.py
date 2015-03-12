@@ -35,12 +35,6 @@ MMS_NUM = 6
 NAMETAG = "<NAME>" # For inserting personalized names. This is parsed in parseNames.
 voice = Voice() # Open an instance of Google Voice. 
 
-def sign_in(): # To google voice. 
-	email = 'speedyswimmer1000@gmail.com'
-	password = 'ylamrmtdwkqetxjw'
-
-	voice.login(email, password)
-
 # TODO features: Sort by first or last name
 # Select all elders or sisters, eq1, eq2, etc. 
 
@@ -90,12 +84,22 @@ sisters_var = BooleanVar()
 contents = StringVar()
 
 # Create a GUI list which has everyone's name.
-listbox = Listbox(win, width=50, height=15, selectmode='multiple', exportselection=1)
-#listbox.grid(row=0, column=0)
-# yscroll = Scrollbar(command=listbox.yview, orient=VERTICAL)
-# listbox.configure(yscrollcommand=yscroll.set)
 
-T = Text(win, height = 8, width = 40)  # Initialize the text box.
+namesListFrame = Frame(win)
+buttonFrame = Frame(win)
+
+messageLabel = Label(namesListFrame, text="List of recipients - \nhighlight name to send text")
+messageLabel.pack()
+
+scrollbar = Scrollbar(namesListFrame)
+scrollbar.pack(side = RIGHT, fill=Y)
+
+listbox = Listbox(namesListFrame, width=50, height=15, selectmode='multiple', exportselection=1, yscrollcommand = scrollbar.set)
+scrollbar.config(command=listbox.yview)
+
+messageLabel = Label(buttonFrame, text="Write text message here!")
+messageLabel.pack()
+T = Text(buttonFrame, height = 8, width = 40)  # Initialize the text box.
 T.pack()
 
 for i in range(len(wardNames)): # Put everyone's name in the list, first and last name.  
@@ -128,39 +132,49 @@ def insert_name():  # Insert the text '<NAME>' in the string at the cursor locat
  
 # GUI Title
 win.wm_title("Ward List")
-frame = Frame(win)
-frame.pack()
+
+pushFrame = Frame(buttonFrame)
+checkFrame = Frame(buttonFrame)
+
+messageLabel = Label(checkFrame, text="Check to select all \nelders and/or sisters:")
+messageLabel.pack()
+
+# Check button that will insert the <NAME> tag in the message. 
+nameButton = Button(pushFrame, bg="cyan")
+nameButton["text"] = "Insert name at cursor"
+nameButton["command"] = insert_name
+nameButton.pack()
 
 # Push button which closes the window, sends the texts. 
-button = Button(frame)
+button = Button(pushFrame, bg="red")
 button['text'] = "Send Text"
 button['command'] = close_window
 button.pack()
 
 # Clear all selections in the list.
-button = Button(frame)
+button = Button(pushFrame, bg="green")
 button['text'] = "Clear List"
 button['command'] = clear_select
 button.pack()
 
 # Checkbuttons - send to all elders and/or all sisters 
-ebutton = Checkbutton(frame)
+ebutton = Checkbutton(checkFrame)
 ebutton['text'] ="Elders"
 ebutton['command'] = lambda: set(elders_var)
 ebutton.pack()
 
-sbutton = Checkbutton(frame)
+sbutton = Checkbutton(checkFrame)
 sbutton['text'] ="Sisters"
 sbutton['command'] = lambda: set(sisters_var)
 sbutton.pack()
 
-# Check button that will insert the <NAME> tag in the message. 
-nameButton = Button(frame)
-nameButton["text"] = "Insert name here"
-nameButton["command"] = insert_name
-nameButton.pack()
-
 #test = IntVar()
+
+pushFrame.pack(side=LEFT, expand=YES)
+checkFrame.pack(side=LEFT, expand=YES)
+
+buttonFrame.pack(side=LEFT, fill=Y)
+namesListFrame.pack(side=BOTTOM, fill=Y)
 
 # Pack the box and start the GUI running. This function causes the GUI to loop until it's exited.
 # It is critical to do the mainloop in front of other functionality. 
@@ -169,27 +183,48 @@ win.mainloop()
 
 ################# END GUI ###################################
 
-selectedIndex = selected_list[0]
+selectedIndex = selected_list[0] # Unsure, but it seems to be working.
 print selectedIndex
 
 contents = contents.get() # Contains the message
 
+if not contents:
+	print "Blank message"
+
 def sendMessage(message, number, sms_gateway):
-	toaddr = number + sms_gateway
-	server.sendmail('speedyswimmer1000@gmail.com', toaddr, message)
+	toaddr = number + sms_gateway # Concatenate the number and the sms gateway.
+	if sms_gateway.lower() == "none" or not sms_gateway:  # Edge case. If sms_gateway is empty or equal to none...
+		voice.send_sms(number, message)
+		print "Sending via google voice"
+	else:
+	# TODO: Option for MMS gateway.
+		server.sendmail('speedyswimmer1000@gmail.com', toaddr, message)
 	
 def parseNames(name):
 	test = re.sub("<NAME>", name, contents, count = 400) # Also a count of how many there are
-	return test
+	# Substitute the "<NAME>" tag with the name of the person. This is called within the function as it prepares to send the name. 
+	return test  # Does not and *should* not permanently replace the name tag in the string. 
 
+	# Open an SMTP server to GMail.
 server = smtplib.SMTP('smtp.gmail.com:587')
 server.starttls()
 server.login(username,password)
 
+def sign_in(): # To google voice. 
+	email = 'speedyswimmer1000@gmail.com'
+	password = 'ylamrmtdwkqetxjw'
+
+	voice.login(email, password)
+	
+sign_in() # To google voice.
+# TODO: Change this password as well. 
+
 for x in range(len(selectedIndex)):
 	wardNames[selectedIndex[x]][SELECTED] = 1
 	
+# Run through and see which names are selected to send a text message to. 	
 for x in range(len(wardNames)):
+	# If is an elder (sister) and the 'Elder' ('Sister') check button was checked, set the 'selected' property of that person. 
 	if wardNames[x][GROUP] == ELDERS:
 		if elders_var.get() == 1:
 			wardNames[x][SELECTED] = 1
@@ -200,13 +235,14 @@ for x in range(len(wardNames)):
 	if wardNames[x][SELECTED] == 1:
 		#message = "This is a test for " + wardNames[x][FIRST] + " " + wardNames[x][LAST] + " at number " + wardNames[x][PHONE_NUM]
 		#print message
-		message = parseNames(wardNames[x][FIRST])
-		message = message.rstrip('\n\r')
-		number = wardNames[x][PHONE_NUM]
+		message = parseNames(wardNames[x][FIRST])  # Replace <NAME> with the name of the person. 
+		message = message.rstrip('\n\r') # Strip off trailing newlines
+		number = wardNames[x][PHONE_NUM]  # Get the name, number, and SMS gateway of the person. 
 		sms_gateway = wardNames[x][SMS_NUM]
 		mms_gateway = wardNames[x][MMS_NUM]
 		print message
-		sendMessage(message, number, sms_gateway)
+		sendMessage(message, number, sms_gateway) # Send the message via the email gateway. 
+		# TODO: Send via google voice if there is not a sms gateway. 
 
 
 # time.sleep(1)
